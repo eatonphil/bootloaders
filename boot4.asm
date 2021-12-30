@@ -1,6 +1,7 @@
 bits 16
 org 0x7c00
-jmp main
+
+	jmp main
 
 cls:
 	mov ah, 0x00
@@ -29,14 +30,32 @@ editor_action:
 
 	call get_position
 
+	;; Handle 0,0 coordinate (do nothing)
+	mov al, dh
+	add al, dl
+	jz .overwrite_character
+
 	cmp dl, 0
-	jz .start_of_line
+	jz .backspace_at_start_of_line
 	dec dl 			; Decrement column
 	call set_position
 	jmp .overwrite_character
-.start_of_line:
+.backspace_at_start_of_line:
 	dec dh 			; Decrement row
 	call set_position
+
+.find_end_of_line:
+	;; Get current position
+	mov ah, 0x08
+	int 0x10
+
+	;; Iterate until the character is null
+	cmp al, 0
+	jz .overwrite_character
+
+	inc dl
+	call set_position
+	jmp .find_end_of_line
 
 .overwrite_character:
 	mov al, 0
