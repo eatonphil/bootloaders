@@ -19,6 +19,23 @@ set_position:
 	int 0x10
 	ret
 
+goto_end_of_line:
+	;; Get current position
+	mov ah, 0x08
+	int 0x10
+
+	;; Iterate until the character is null
+	cmp al, 0
+	jz .done
+
+	inc dl
+	call set_position
+	jmp goto_end_of_line
+
+.done:
+
+	ret
+
 editor_action:
 	;; Read character
 	mov ah, 0x00
@@ -44,18 +61,7 @@ editor_action:
 	dec dh 			; Decrement row
 	call set_position
 
-.find_end_of_line:
-	;; Get current position
-	mov ah, 0x08
-	int 0x10
-
-	;; Iterate until the character is null
-	cmp al, 0
-	jz .overwrite_character
-
-	inc dl
-	call set_position
-	jmp .find_end_of_line
+	call goto_end_of_line
 
 .overwrite_character:
 	mov al, 0
@@ -78,6 +84,40 @@ editor_action:
 	ret
 
 .done_enter:
+
+	mov cl, al 		; So we can restore
+
+	;; Handle ctrl-a
+
+	;; Check ctrl key
+	;; mov ah, 0x02
+	;; int 0x16
+
+	mov al, [0x0417]
+	and al, 0x04
+	jz .done_ctrl_a
+
+	mov ax, [0x41a]
+	cmp ah, 97
+	jnz .done_ctrl_a
+
+	mov dl, 0
+	call set_position
+
+	ret
+
+.done_ctrl_a:
+	mov al, cl 		; Restore al
+
+	;; Handle ctrl-e
+	cmp al, 0x12
+	jnz .done_ctrl_e
+
+	call goto_end_of_line
+
+	ret
+
+.done_ctrl_e:
 
 	;; Print input
 	mov ah, 0x0e
