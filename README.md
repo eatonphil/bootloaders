@@ -14,3 +14,4 @@ Notes
 * bootloader tutorial: http://3zanders.co.uk/2017/10/13/writing-a-bootloader/
 * bootlaoder tutorial: https://www.briansteffens.com/2020/01/15/hello-world-from-a-bootloader.html
 * bootloader tutorial: https://www.ired.team/miscellaneous-reversing-forensics/windows-kernel-internals/writing-a-custom-bootloader
+* bootloader graphics: https://0x00sec.org/t/realmode-assembly-writing-bootable-stuff-part-5/3667
