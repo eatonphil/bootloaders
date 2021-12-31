@@ -5,53 +5,90 @@ org 0x7c00
 
 	jmp main
 
-cls:
+%macro cls 0
 	mov ah, 0x00
 	mov al, 0x03
 	int 0x10
-	ret
+%endmacro
 
-get_position:
+%macro clear_key_buffer 0
+	mov ax, [0x041a]
+	mov [0x041c], ax
+%endmacro
+
+%macro read_character 0
+	;; Read character
+	mov ah, 0
+	int 0x16
+%endmacro
+
+%macro print_character 1
+	mov ax, %1
+ 	mov ah, 0x0e
+ 	int 0x10
+%endmacro
+
+%macro div3 3
+	mov edx, 0        ; clear dividend
+	mov eax, %2
+	mov ecx, %3
+	div ecx
+	mov %1, ax
+	add %1, 48
+%endmacro
+
+%macro print_int 1
+	div3 ax, %1, 10000
+	print_character ax
+	div3 ax, %1, 1000
+	print_character ax
+	div3 ax, %1, 100
+	print_character ax
+	div3 ax, %1, 10
+	print_character ax
+	div3 ax, %1, 1
+	print_character ax
+%endmacro
+
+%macro get_position 0
 	mov ah, 0x03
 	int 0x10
-	ret
+%endmacro
 
-set_position:
+%macro set_position 0
 	mov ah, 0x02
 	int 0x10
-	ret
+%endmacro
 
 goto_end_of_line:
 ;; Get current character
-	xor bx, bx
 	mov ah, 0x08
 	int 0x10
 
 ;; Iterate until the character is null
 	cmp al, 0
 	jz .done
+	jnz .done 		; TODO: remove
 
 	inc dl
-	call set_position
+	set_position
 	jmp goto_end_of_line
 
 .done:
-
 	ret
 
+%macro mov_read_ctrl_flag_into 1
+	mov %1, [0x0417]
+	and %1, 0x04 		; Grab 3rd bit: %1 & 0b0100
+%endmacro
+
+%macro mov_read_character_into 1
+	mov ds, [0x041a]
+	mov %1, [0x041e]
+%endmacro
+
 editor_action:
-;; Read character
-	mov ah, 0
-	int 0x16
-
-;; Store ctrl-set flag is 1 from top of stack
-  	mov bx, [0x0417]
-  	and bx, 0x04 		; Grab 3rd bit: & 0b0100
- 	push bx
-
-;; Check pressed key directly
-  	;mov ax, [0x041e] ; Read character is top of stack
-	push ax
+	read_character
 
 ;; Ignore arrow keys
 	cmp ah, 0x4b 		; Left
@@ -64,7 +101,6 @@ editor_action:
 	jz .done
 
 ;; Handle backspace
-	mov ax, [esp]
  	cmp al, 0x08
  	jz .is_backspace
 
@@ -73,7 +109,7 @@ editor_action:
 
 .is_backspace:
 
- 	call get_position
+ 	get_position
 
 ;; Handle 0,0 coordinate (do nothing)
  	mov al, dh
@@ -83,32 +119,32 @@ editor_action:
  	cmp dl, 0
  	jz .backspace_at_start_of_line
  	dec dl 			; Decrement column
- 	call set_position
+ 	set_position
  	jmp .overwrite_character
 .backspace_at_start_of_line:
  	dec dh 			; Decrement row
- 	call set_position
+ 	set_position
 
  	call goto_end_of_line
 
 .overwrite_character:
- 	mov al, 0
- 	mov ah, 0x0a
- 	int 0x10
+ 	; mov al, 0
+ 	; mov ah, 0x0a
+ 	; int 0x10
 
  	jmp .done
 
 .done_backspace:
 
 ;; Handle enter
-	mov ax, [esp]
+	mov_read_character_into ax
  	cmp al, 0x0d
  	jnz .done_enter
 
- 	call get_position
+ 	get_position
  	inc dh 			; Increment line
  	mov dl, 0 		; Reset column
- 	call set_position
+ 	set_position
 
  	jmp .done
 
@@ -117,27 +153,24 @@ editor_action:
 ;; Handle ctrl- shortcuts
 
 ;; Check ctrl key
-	mov ax, [esp+1]
+	mov_read_ctrl_flag_into ax
   	jz .ctrl_not_set
 
 ;; Handle ctrl-a shortcut
-	mov ax, [esp]
+	mov_read_character_into ax
 	cmp al, 97
 	jnz .not_ctrl_a
 
 ;; Reset column
   	mov dl, 0
-  	call set_position
+  	set_position
 
   	jmp .done
 
 .not_ctrl_a:
 
 ;; Handle ctrl-e shortcut
-	mov ax, [esp]
-	mov ah, 0x0e
-	int 0x10
-	mov ax, [esp]
+	mov_read_character_into ax
 	cmp al, 101
 	jnz .not_ctrl_e
 
@@ -149,21 +182,23 @@ editor_action:
 
 .ctrl_not_set:
 
-;; Print input
-	mov ax, [esp]
- 	mov ah, 0x0e
- 	int 0x10
+	mov_read_character_into ax
+	print_character ax
 
 .done:
-	pop ax
-	pop ax
- 	ret
+	ret
 
 main:
-	call cls
+	cls
 
 .loop:
-	call editor_action
+	;call editor_action
+	read_character
+	mov ax, [0x0400]
+	add ax, [0x041a]
+	;print_character ax
+	;mov ax, [0x041a]
+	print_int 6234
 	jmp .loop
 
 times 510 - ($-$$) db 0 ; pad remaining 510 bytes with zeroes
