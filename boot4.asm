@@ -29,25 +29,32 @@ org 0x7c00
 %endmacro
 
 %macro div3 3
-	mov edx, 0        ; clear dividend
 	mov eax, %2
 	mov ecx, %3
+	mov edx, 0
 	div ecx
-	mov %1, ax
-	add %1, 48
+	add eax, 48 		; Convert to ascii number
 %endmacro
 
-%macro print_int 1
+%macro print_uint8 1
+	mov eax, %1
+	and eax, 0xFF		; Drop greater digits
+	div3 ax, eax, 100
+	print_character ax
+	div3 ax, edx, 10
+	print_character ax
+	add dx, 48 		; Convert remainder to ascii number
+	print_character dx
+%endmacro
+
+%macro print_uint16 1
+	mov eax, %1
+	and eax, 0xFFFF		; Drop greater digits
 	div3 ax, %1, 10000
 	print_character ax
-	div3 ax, %1, 1000
+	div3 ax, edx, 1000
 	print_character ax
-	div3 ax, %1, 100
-	print_character ax
-	div3 ax, %1, 10
-	print_character ax
-	div3 ax, %1, 1
-	print_character ax
+	print_uint8 edx
 %endmacro
 
 %macro get_position 0
@@ -68,7 +75,6 @@ goto_end_of_line:
 ;; Iterate until the character is null
 	cmp al, 0
 	jz .done
-	jnz .done 		; TODO: remove
 
 	inc dl
 	set_position
@@ -83,8 +89,12 @@ goto_end_of_line:
 %endmacro
 
 %macro mov_read_character_into 1
-	mov ds, [0x041a]
-	mov %1, [0x041e]
+	mov eax, [0x041a]
+	add eax, 0x03fe 	; Offset from 0x0400 - sizeof(uint16) (since head points to next free slot, not last/current slot)
+	and eax, 0xFFFF
+
+	mov %1, [eax]
+	and %1, 0xFF
 %endmacro
 
 editor_action:
@@ -128,9 +138,9 @@ editor_action:
  	call goto_end_of_line
 
 .overwrite_character:
- 	; mov al, 0
- 	; mov ah, 0x0a
- 	; int 0x10
+ 	mov al, 0
+ 	mov ah, 0x0a
+ 	int 0x10
 
  	jmp .done
 
@@ -158,7 +168,7 @@ editor_action:
 
 ;; Handle ctrl-a shortcut
 	mov_read_character_into ax
-	cmp al, 97
+	cmp al, 1 		; For some reason with ctlr, these are offset from a-z
 	jnz .not_ctrl_a
 
 ;; Reset column
@@ -171,7 +181,7 @@ editor_action:
 
 ;; Handle ctrl-e shortcut
 	mov_read_character_into ax
-	cmp al, 101
+	cmp al, 5
 	jnz .not_ctrl_e
 
 	call goto_end_of_line
@@ -192,13 +202,7 @@ main:
 	cls
 
 .loop:
-	;call editor_action
-	read_character
-	mov ax, [0x0400]
-	add ax, [0x041a]
-	;print_character ax
-	;mov ax, [0x041a]
-	print_int 6234
+	call editor_action
 	jmp .loop
 
 times 510 - ($-$$) db 0 ; pad remaining 510 bytes with zeroes
