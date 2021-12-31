@@ -1,3 +1,5 @@
+	; -*- mode: nasm;-*-
+
 bits 16
 org 0x7c00
 
@@ -20,11 +22,12 @@ set_position:
 	ret
 
 goto_end_of_line:
-	;; Get current position
+;; Get current character
+	xor bx, bx
 	mov ah, 0x08
 	int 0x10
 
-	;; Iterate until the character is null
+;; Iterate until the character is null
 	cmp al, 0
 	jz .done
 
@@ -37,93 +40,124 @@ goto_end_of_line:
 	ret
 
 editor_action:
-	;; Read character
-	mov ah, 0x00
+;; Read character
+	mov ah, 0
 	int 0x16
 
-	;; Handle backspace
-	cmp al, 0x08
-	jnz .done_backspace
+;; Store ctrl-set flag is 1 from top of stack
+  	mov bx, [0x0417]
+  	and bx, 0x04 		; Grab 3rd bit: & 0b0100
+ 	push bx
 
-	call get_position
+;; Check pressed key directly
+  	;mov ax, [0x041e] ; Read character is top of stack
+	push ax
 
-	;; Handle 0,0 coordinate (do nothing)
-	mov al, dh
-	add al, dl
-	jz .overwrite_character
+;; Ignore arrow keys
+	cmp ah, 0x4b 		; Left
+	jz .done
+	cmp ah, 0x50 		; Down
+	jz .done
+	cmp ah, 0x4d 		; Right
+	jz .done
+	cmp ah, 0x48 		; Up
+	jz .done
 
-	cmp dl, 0
-	jz .backspace_at_start_of_line
-	dec dl 			; Decrement column
-	call set_position
-	jmp .overwrite_character
+;; Handle backspace
+	mov ax, [esp]
+ 	cmp al, 0x08
+ 	jz .is_backspace
+
+ 	cmp al, 0x7F 		; For mac keyboards
+ 	jnz .done_backspace
+
+.is_backspace:
+
+ 	call get_position
+
+;; Handle 0,0 coordinate (do nothing)
+ 	mov al, dh
+ 	add al, dl
+ 	jz .overwrite_character
+
+ 	cmp dl, 0
+ 	jz .backspace_at_start_of_line
+ 	dec dl 			; Decrement column
+ 	call set_position
+ 	jmp .overwrite_character
 .backspace_at_start_of_line:
-	dec dh 			; Decrement row
-	call set_position
+ 	dec dh 			; Decrement row
+ 	call set_position
 
-	call goto_end_of_line
+ 	call goto_end_of_line
 
 .overwrite_character:
-	mov al, 0
-	mov ah, 0x0a
-	int 0x10
+ 	mov al, 0
+ 	mov ah, 0x0a
+ 	int 0x10
 
-	ret
+ 	jmp .done
 
 .done_backspace:
 
-	;; Handle enter
-	cmp al,0x0d
-	jnz .done_enter
+;; Handle enter
+	mov ax, [esp]
+ 	cmp al, 0x0d
+ 	jnz .done_enter
 
-	call get_position
-	inc dh 			; Increment line
-	mov dl, 0 		; Reset column
-	call set_position
+ 	call get_position
+ 	inc dh 			; Increment line
+ 	mov dl, 0 		; Reset column
+ 	call set_position
 
-	ret
+ 	jmp .done
 
 .done_enter:
 
-	mov cl, al 		; So we can restore
+;; Handle ctrl- shortcuts
 
-	;; Handle ctrl-a
+;; Check ctrl key
+	mov ax, [esp+1]
+  	jz .ctrl_not_set
 
-	;; Check ctrl key
-	;; mov ah, 0x02
-	;; int 0x16
+;; Handle ctrl-a shortcut
+	mov ax, [esp]
+	cmp al, 97
+	jnz .not_ctrl_a
 
-	mov al, [0x0417]
-	and al, 0x04
-	jz .done_ctrl_a
+;; Reset column
+  	mov dl, 0
+  	call set_position
 
-	mov ax, [0x41a]
-	cmp ah, 97
-	jnz .done_ctrl_a
+  	jmp .done
 
-	mov dl, 0
-	call set_position
+.not_ctrl_a:
 
-	ret
-
-.done_ctrl_a:
-	mov al, cl 		; Restore al
-
-	;; Handle ctrl-e
-	cmp al, 0x12
-	jnz .done_ctrl_e
-
-	call goto_end_of_line
-
-	ret
-
-.done_ctrl_e:
-
-	;; Print input
+;; Handle ctrl-e shortcut
+	mov ax, [esp]
 	mov ah, 0x0e
 	int 0x10
+	mov ax, [esp]
+	cmp al, 101
+	jnz .not_ctrl_e
 
-	ret
+	call goto_end_of_line
+	jmp .done
+
+.not_ctrl_e:
+ 	jmp .done
+
+.ctrl_not_set:
+
+;; Print input
+	mov ax, [esp]
+ 	mov ah, 0x0e
+ 	int 0x10
+
+.done:
+	pop ax
+	pop ax
+ 	ret
 
 main:
 	call cls
