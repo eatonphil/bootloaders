@@ -1,3 +1,12 @@
+; FROM https://www.quaxio.com/bootloader_retro_game_tweet/
+; floppy.asm: a bootloader(*) + retro game which fits in a tweet:
+;
+; perl -E"say'sgFoAKAHvqB9uBMAzRC/wPi5gAjzqqqBxz4Bc/jkYDxIchE8UHcNN5hISH
+; IFLAJrwLCJwgHWtQa0C80Q4vwmMCR72uv','B'x589,'Vao='"|base64 -D>boot.img
+;
+; to compile and run:
+; nasm floppy.asm -o floppy.img
+; qemu-system-i386 -fda floppy.img
           [bits 16]                    ; Pragma, tells the assembler that we
                                        ; are in 16 bit mode (which is the state
                                        ; of x86 when booting from a floppy).

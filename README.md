@@ -1,4 +1,14 @@
-Notes
+## Bootloader fun
+
+Code is buggy! Requires nasm and qemu (on macOS or Linux).
+
+Example:
+
+```
+./scripts/build_and_run.sh snake
+```
+
+## Notes
 * How DIV works: https://stackoverflow.com/questions/8021772/assembly-language-how-to-do-modulo
 * ASCII table: https://www.rapidtables.com/code/text/ascii-table.html
 * BIOS map: https://www.tau.ac.il/~flaxer/edu/course/processcontrol/BiosDataArea.pdf
